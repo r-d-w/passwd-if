@@ -1,0 +1,33 @@
+<!--
+Copyright 2017 Ryan David Williams
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<!doctype html>
+{% extends "base.html" %}
+{% block title %}Password Interface Login{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-md-5"></div>
+    <div id="div_login_form" class="page_module_top page_module col-md-2">
+        <form method="post" action="/authenticate">
+            <p><input placeholder="username" type="text" name="username">
+            <p><input placeholder="password" type="password" name="password">
+            {% if redirect %}
+            <p><input type="hidden" name="redirect" value="{{ redirect }}">
+            {% endif %}
+            <p><input type="submit" value="Login">
+        </form>
+    </div>
+    <div class="col-md-5"></div>
+{% endblock %}

@@ -1,0 +1,89 @@
+{
+    "name_attribute": "displayName",
+    "admin_group": "<DN_OF_ADMIN_GROUP>",
+    "email_attribute": "mail",
+    "SESSION_TYPE": "redis",
+    "SESSION_COOKIE_NAME": "passwd_if",
+    # this option requires a reverse proxy doing https
+    "SESSION_COOKIE_SECURE": true,
+    "PERMANENT_SESSION_LIFETIME": 600,
+    "SECRET_KEY": null,
+    "INSECURE_VIEWS": [
+        "login",
+        "authenticate",
+        "logout",
+        "static"
+    ],
+    "logging_conf": {
+        "handlers": {
+            "syslog": {
+                "class": "logging.handlers.SysLogHandler",
+                "formatter": "full",
+                "address": "/dev/log",
+                "level": "DEBUG"
+            },
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "brief",
+                "stream": "ext://sys.stdout",
+                "level": "DEBUG"
+            }
+        },
+        "root": {
+            "handlers": [
+                "syslog",
+                "console"
+            ],
+            "level": "DEBUG"
+        },
+        "disable_existing_loggers": false,
+        "formatters": {
+            "full": {
+                "format": "%(name)s[%(process)s]: %(levelname)s %(message)s"
+            },
+            "brief": {
+                "format": "%(levelname)s %(message)s"
+            }
+        },
+        "version": 1
+    },
+    "PASS_CHECK": {
+        "max_history": 24,
+        "track_usage": true,
+        "policies": {
+            "25": {
+                "char_classes": 1,
+                "expires": 720
+            },
+            "10": {
+                "expires": 180
+            }
+        }
+    },
+    "EMAIL": {
+        "email_from": "<EMAIL_FROM>",
+        "email_subject_template": "A password reset has been initiated on your behalf at {} by {}",
+        "email_message_template": "Click the link below to reset your SSO password\n{}",
+        "smtp_host": "<SMTP_SERVER>",
+        # optional. defaults to 25
+        "smtp_port": <SMTP_SERVER_PORT>,
+        # optional if smtp starttls is needed. defaults to false
+        "smtp_starttls": true,
+        # optional if smtp auth required
+        "smtp_user": "<SMTP_USERNAME>",
+        "smtp_pass": "<SMTP_PASSWORD>"
+    },
+    "LDAP": {
+        "host": "<LDAP_HOST>",
+        "ldap_type": "active_directory",
+        "bind_user": "<BIND_USER_DN>",
+        "search_base": "<LDAP_SEARCH_BASE>",
+        "username_attribute": "sAMAccountName",
+        # optional. defaults to 389
+        "port": 389,
+        # optional. enable starttls with ldap connection
+        "start_tls": true,
+        # optional. better to leave as none and provide at runtime
+        "bind_passwd": none,
+    }
+}

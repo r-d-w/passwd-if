@@ -1,0 +1,111 @@
+<!--
+Copyright 2017 Ryan David Williams
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+{% extends "base.html" %}
+{% block title %}Password Interface Reset Your Password{% endblock %}
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='select2/css/select2.min.css') }}">
+    <script src="{{ url_for('static', filename='select2/js/select2.min.js') }}"></script>
+{% endblock %}
+{% block content %}
+    <div class="row">
+        <div class="col-md-3"></div>
+        <div id="requirements" class="page_module_top page_module col-md-6">
+            <div class="module_title"><h4>Password Requirements</h4></div>
+            <div><span>You may not reusue the last {{ requirements.max_history }} passwords</span></div>
+            {% for min_len, policy in requirements.policies.items() %}
+            <div class="requirement_text">
+                <div><span>For passwords at least {{ min_len }} characters long:</span></div>
+                <div><span>Number of required character classes (upper, lower, number symbol): {{ policy.get('char_classes', 4) }}</span></div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="col-md-3"><div><button id="button_logout" class="btn btn-default" onclick="location.href = '{{ url_for('logout') }}'">Logout</button></div></div>
+    </div>
+    <div class="row">
+        <div class="col-md-3"></div>
+        <div id="self_reset" class="page_module col-md-6">
+            <div class="module_title"><h3>Self Reset</h3></div>
+            <form method="post" id="self_reset_form" action="/setUserPassword">
+                {% if not token_reset %}
+                <div class="row">
+                    <div class="col-md-4"></div>
+                    <div class="col-md-4">
+                        <input class="page_module_input_text form-control" placeholder="current password" type="password" name="current_password" />
+                    </div>
+                    <div class="col-md-4"></div>
+                </div>
+                {% endif %}
+                <div class="row">
+                    <div class="col-md-4"></div>
+                    <div class="col-md-4"><input class="page_module_input_text form-control" placeholder="new password" type="password" name="new_password" id="userNewPass" /></div>
+                    <div id="self_reset_new_pass_str" class="col-md-4 new_pass_str"></div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4"></div>
+                    <div class="col-md-4"><input class="page_module_input_text form-control" placeholder="confirm password" type="password" name="confirm_password" id="userNewPassConfirm" /></div>
+                    <div class="col-md-4"></div>
+                </div>
+                <div id="divCheckPassword"></div>
+                <div class="submit"><input type="submit" value="Submit" class="reset_submit btn btn-default" id="self_reset_submit" /></div>
+            </form>
+        </div>
+        <div class="col-md-3"></div>
+    </div>
+    {% if admin %}
+    <div class="row">
+        <div class="col-md-3"></div>
+        <div id="direct_reset" class="col-md-6 page_module">
+            <form method="post" id="direct_reset_form" action="/setUserPassword">
+                <div class="module_title"><h3>Direct User Reset</h3></div>
+                <div class="row">
+                    <div class="col-md-4"></div>
+                    <div class="col-md-4"><input class="page_module_input_text form-control" placeholder="username" type=text name="username" /></div>
+                    <div class="col-md-4"></div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4"></div>
+                    <div class="col-md-4">
+                        <input class="page_module_input_text form-control" placeholder="new password" type="password" name="new_password" id="adminNewPass" />
+                    </div>
+                    <div id="direct_reset_new_pass_str" class="col-md-4 new_pass_str"></div>
+                </div>
+                <div class="submit"><input type="submit" value="Submit" class="btn btn-default reset_submit" id="direct_reset_submit"></div>
+            </form>
+        </div>
+        <div class="col-md-3"></div>
+    </div>
+    <div class="row">
+        <div class="col-md-3"></div>
+        <div id="email_reset" class="col-md-6 page_module">
+            <div class="module_title"><h3>Self Service Password Reset</h3></div>
+            <div class="module_instructions">Select the users you wish to trigger a password reset for.</div>
+            <form method="post" action="/emailReset">
+                <p><select class="form-control" id="select_email_reset_users" multiple name=user style="width: 100%">
+                    {% for val, name in users.items() %}
+                        <option value="{{ val }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+                <p><input class="btn btn-default" type="submit" value="Email Reset Links">
+            </form>
+        </div>
+        <div class="col-md-3"></div>
+    </div>
+    {% endif %}
+{% endblock %}
+{% block page_scripts %}
+    <script src="{{ url_for('static', filename='resetPasswd.js') }}"></script>
+{% endblock %}
