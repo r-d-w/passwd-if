@@ -234,7 +234,7 @@ class LDAPConnector(object):
         ldap_filter = '({}={})'.format(self._conf['username_attribute'], username)
         try:
             return self.search(ldap_filter)[0]
-        except KeyError:
+        except :
             return None
         finally:
             self._disconnect()
@@ -402,8 +402,11 @@ class PasswordChecker(object):
         self._redis_prefix = self._conf.get('redis_prefix', self.DEFAULT_REDIS_PASSWORD_PREFIX)
         self._bcrypt_salt = self._conf.get('blowfish_salt', self.DEFAULT_BLOWFISH_SALT)
         self.max_history = self._conf.get('max_history', self.DEFAULT_MAX_HISTORY)
-        self.policies = OrderedDict(
-            sorted(conf.get('policies', self.DEFAULT_POLICY).items(), key=lambda x: x[0]))
+        self.policies = OrderedDict(sorted(
+            {
+                int(key): val
+                for key, val in conf.get('policies', self.DEFAULT_POLICY).items()}.items(),
+            key=lambda x: x[0]))
 
     def _create_bcrypt_hash(self, password):
         return self._bcrypt.hashpw(

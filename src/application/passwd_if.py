@@ -27,7 +27,7 @@ from flask import Flask, request, session, jsonify, redirect, url_for, render_te
 
 from .password_interface import common
 from .password_interface.classes import (LDAPConnector, RedisTokens, Emailer, PasswdApiError,
-                                         Session, PasswordChecker)
+                                         Session, PasswordChecker, LDAPConnectorError)
 
 
 app = Flask(__name__)
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 LDAP = LDAPConnector(app.config['LDAP'])
 TOKEN = RedisTokens({'redis': REDIS})
 EMAIL = Emailer(app.config['EMAIL'])
-PC = PasswordChecker(app.config['PASS_CHECK'])
+PC = PasswordChecker(app.config['PASS_CHECK'], REDIS)
 Session(app)
 
 
@@ -182,20 +182,23 @@ def setUserPassword():
     if not check_ret[0]:
         session.set_message({'msg_type': 'error', 'msg': check_ret[1]})
         return redirect(url_for('resetPasswd'))
-    if LDAP.set_user_password(username, new_pass):
-        message = {'msg_type': 'success', 'msg': 'Password change successful'}
-        if current_password or is_token_reset:
-            session.clear()
-            session.set_message(message)
-            PC.add_password(username, new_pass)
-            return redirect(url_for('login'))
+    try:
+        if LDAP.set_user_password(username, new_pass):
+            message = {'msg_type': 'success', 'msg': 'Password change successful'}
+            if current_password or is_token_reset:
+                session.clear()
+                session.set_message(message)
+                PC.add_password(username, new_pass)
+                return redirect(url_for('login'))
+            else:
+                PC.add_password(username, new_pass)
+                session.set_message(message)
+                return redirect(url_for('resetPasswd'))
         else:
-            PC.add_password(username, new_pass)
-            session.set_message(message)
+            session.set_message({'msg_type': 'error', 'msg': 'Password change failed'})
             return redirect(url_for('resetPasswd'))
-    else:
-        session.set_message({'msg_type': 'error', 'msg': 'Password change failed'})
-        return redirect(url_for('resetPasswd'))
+    except LDAPConnectorError as exc:
+        session.set_message({'msg_type': 'error', 'msg': exc.error})
 
 @app.route('/logout')
 def logout():
