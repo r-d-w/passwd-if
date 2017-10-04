@@ -32,10 +32,14 @@ ADD conf /etc/password_interface
 RUN ln -s /etc/password_interface/apache2.conf /etc/apache2/sites-available/password_interface.conf \
   && a2ensite password_interface \
   && a2dissite 000-default \
-  && a2enmod wsgi
+  && a2enmod wsgi \
+  && a2enmod ssl \
+  && a2enmod rewrite \
+  && mv /etc/password_interface/certs/server.c* /etc/ssl/certs \
+  && mv /etc/password_interface/certs/server.key /etc/ssl/private
 
 ADD src /opt/passwd_if
 
-EXPOSE 80
+EXPOSE 80 443
 
 CMD ["/usr/sbin/apache2ctl", "-D", "FOREGROUND"]

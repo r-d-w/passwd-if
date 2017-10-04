@@ -1,3 +1,4 @@
 .vscode
 conf/passwd_interface_conf.json
+conf/certs
 *.pyc
