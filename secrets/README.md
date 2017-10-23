@@ -1,0 +1,1 @@
+Secrets go in this folder.  You will want to create a `certs` directory that contains a `server.crt` and `server.key` file for SSL termination.  `server.crt` should contain the entire chain, server cert first, encoded in PEM.

@@ -93,13 +93,13 @@ limitations under the License.
         <div id="email_reset" class="col-md-6 page_module">
             <div class="module_title"><h3>Self Service Password Reset</h3></div>
             <div class="module_instructions">Select the users you wish to trigger a password reset for.</div>
-            <form method="post" action="/emailReset">
+            <form method="post" action="/tokenReset">
                 <p><select class="form-control" id="select_email_reset_users" multiple name=user style="width: 100%">
                     {% for val, name in users.items() %}
                         <option value="{{ val }}">{{ name }}</option>
                     {% endfor %}
                 </select>
-                <p><input class="btn btn-default" type="submit" value="Email Reset Links">
+                <p><input class="btn btn-default" name="email" type="submit" value="Email Reset Links"><input class="btn btn-default" name="slack" type="submit" value="Slack Reset Links">
             </form>
         </div>
         <div class="col-md-3"></div>

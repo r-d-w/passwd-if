@@ -15,20 +15,20 @@
 ####################################
 
 <VirtualHost *:443>
-  DocumentRoot 			/var/www
+  ServerName                <YOUR_FQDN>
+  DocumentRoot 			    /var/www
 
-  SSLEngine 			on
-  SSLCertificateFile 		/etc/ssl/certs/server.crt
-  SSLCertificateKeyFile 	/etc/ssl/private/server.key
-  SSLCertificateChainFile 	/etc/ssl/certs/server.ca-bundle
+  SSLEngine 			    on
+  SSLCertificateFile 		/certs/server.crt
+  SSLCertificateKeyFile 	/certs/server.key
 
   AddType text/html .py
 
   WSGIDaemonProcess passwd_if python-home=/opt/passwd_if/env
 
-  WSGIPassAuthorization On
-  WSGIProcessGroup passwd_if
-  WSGIApplicationGroup %{GLOBAL}
+  WSGIPassAuthorization     On
+  WSGIProcessGroup          passwd_if
+  WSGIApplicationGroup      %{GLOBAL}
 
   WSGIScriptAlias / /opt/passwd_if/conf/application.wsgi
 
@@ -38,7 +38,6 @@
 </VirtualHost>
 
 <VirtualHost *:80>
-    RewriteEngine On
-    RewriteCond %{HTTPS} off
-    RewriteRule (.*) https://%{SERVER_NAME}/$1 [R,L]
+  ServerName    <YOUR_FQDN>
+  Redirect      / https://<YOUR_FQDN>/
 </VirtualHost>

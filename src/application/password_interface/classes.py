@@ -26,6 +26,7 @@ from collections import OrderedDict
 
 
 import ldap3
+from slackclient import SlackClient
 from flask_session import Session as _Session
 
 
@@ -234,7 +235,8 @@ class LDAPConnector(object):
         ldap_filter = '({}={})'.format(self._conf['username_attribute'], username)
         try:
             return self.search(ldap_filter)[0]
-        except :
+        except IndexError:
+            logger.info('Username not found.')
             return None
         finally:
             self._disconnect()
@@ -247,13 +249,16 @@ class LDAPConnector(object):
         self._disconnect()
         return results
 
-
     def auth_user(self, username, password):
         """take a user and passwords and tests authentication using
         a bind to the AD. returns true if successful"""
         logger.debug('auth_user username: %s')
         config = self._conf.copy()
-        user_dn = self.find_ldap_user(username).entry_dn
+        try:
+            user_dn = self.find_ldap_user(username).entry_dn
+        except AttributeError:
+            logger.debug('Username not found')
+            return False
         logger.debug('dn found for user: %s', user_dn)
         config.update({'bind_user': user_dn, 'bind_passwd': password})
         try:
@@ -265,10 +270,10 @@ class LDAPConnector(object):
             logger.debug('User auth failed')
             return False
 
-    def set_user_password(self, username, new_pass):
+    def set_user_password(self, username, new_pass, current_password=None):
         """sets the users password to the supplied string, returns True for successful and
         the error message if its not"""
-        logger.debug('set_user_password username: %s')
+        logger.debug('set_user_password username: %s', username)
         passwdf = getattr(self._ldap.extend, self._ldap_type).modify_password
         try:
             user_dn = self.find_ldap_user(username).entry_dn
@@ -276,7 +281,9 @@ class LDAPConnector(object):
         except AttributeError:
             raise LDAPConnectorError(error='username not found: {}'.format(username))
         self.connect()
-        return passwdf(user_dn, new_pass)
+        resp = passwdf(user_dn, new_pass, current_password)
+        logger.debug('modify_password_response: %s', resp)
+        return resp
 
 
 class Emailer(object):
@@ -339,6 +346,43 @@ class Emailer(object):
             self._smtp.quit()
 
 
+class SlackAPI(object):
+    """Used for interacting with Slack"""
+
+    def __init__(self, conf):
+        """initalizes SlackAPI object.
+
+        Args:
+            conf: dict - {
+                'web_api_token': 'xoxp-XXXXXXXXXXXXXXXXXX',     #req
+                'search_field': 'email'                         #opt - defaults 'display_name'
+            }
+        """
+        self._conf = conf
+        try:
+            self._slack = SlackClient(conf['web_api_token'])
+            self._search_field = conf.get('search_field', 'display_name')
+        except KeyError as exc:
+            raise SlackAPIError('SlackAPI configuration dict requires: {}'.format(exc))
+
+    def get_userid(self, query, field=None):
+        """uses the configured field and supplied value to search for and returns slack userid"""
+        users = self._slack.api_call('users.list')['members']
+        if not field:
+            field = self._search_field
+        for user in users:
+            if field in user:
+                if user[field] == query:
+                    return user['id']
+            if field in user['profile']:
+                if user['profile'][field] == query:
+                    return user['id']
+ 
+    def send_message(self, uid, message):
+        """send a message to the specified user"""
+        self._slack.api_call('chat.postMessage', channel=uid, text=message)
+
+
 class PasswordChecker(object):
     """Used to verify if a password meets the configured requirements"""
 
@@ -397,7 +441,8 @@ class PasswordChecker(object):
             self._redis = StrictRedis()
         else:
             self._redis = redis
-        if conf.get('track_usage', True):
+        self._track = conf.get('track_usage', True)
+        if self._track:
             self._bcrypt = import_module('bcrypt')
         self._redis_prefix = self._conf.get('redis_prefix', self.DEFAULT_REDIS_PASSWORD_PREFIX)
         self._bcrypt_salt = self._conf.get('blowfish_salt', self.DEFAULT_BLOWFISH_SALT)
@@ -428,6 +473,8 @@ class PasswordChecker(object):
 
     def add_password(self, username, password):
         """addes a password hash for the user to the history db"""
+        if not self._track:
+            return
         key = self._create_key(username)
         llen = self._redis.lpush(key, self._create_bcrypt_hash(password))
         if llen > self.max_history:
@@ -445,7 +492,7 @@ class PasswordChecker(object):
                         False, 'You are required to have {} character classes you are missing:'
                         ' {}'.format(req_char_classes, ', '.join(failures)))
                 else:
-                    if not self._check_history(username, password):
+                    if self._track and not self._check_history(username, password):
                         return (
                             False,
                             'You cannot reuse the last {} passwords'.format(self.max_history))
@@ -465,6 +512,17 @@ class LDAPConnectorError(Exception):
         logger.error('%s error msg: %s', self.__class__.__name__, self.error)
         logger.debug('%s error detail msg: %s', self.__class__, self.detail)
         super(LDAPConnectorError, self).__init__('{} : {}'.format(error, detail), *args, **kwargs)
+
+
+class SlackAPIError(Exception):
+    """logs exceptions at various log levels"""
+
+    def __init__(self, error, detail=None, *args, **kwargs):
+        self.error = error
+        self.detail = detail
+        logger.error('%s error msg: %s', self.__class__.__name__, self.error)
+        logger.debug('%s error detail msg: %s', self.__class__, self.detail)
+        super(SlackAPIError, self).__init__('{} : {}'.format(error, detail), *args, **kwargs)
 
 
 class PasswdApiError(Exception):

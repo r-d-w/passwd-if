@@ -29,13 +29,13 @@ secrets = {
 
 DEFAULT_CONF_FILE = '/etc/password_interface/passwd_interface_conf.json'
 DEFAULT_LOGGER_NAME = 'passwd_interface'
+DEFAULT_REDIS_HOST = 'passwd_if_redis_server'
 
 CONF_FILE = os.environ.get(env_prepend + 'CONF_FILE', DEFAULT_CONF_FILE) 
 CONF_OVERRIDE_FILE = os.environ.get(env_prepend + 'CONF_OVERRIDE_FILE')
 LOGGER_NAME = os.environ.get(env_prepend + 'LOGGER_NAME', DEFAULT_LOGGER_NAME)
 DEBUG = os.environ.get(env_prepend + 'DEBUG', False)
-REDIS_HOST = os.environ.get(env_prepend + 'REDIS_HOST', 'localhost')
-
+REDIS_HOST = os.environ.get(env_prepend + 'REDIS_HOST', DEFAULT_REDIS_HOST)
 
 def init_json_logging(conf, debug=None):
     """Initializes the global logging stuffz from a logging dictionary.
@@ -57,12 +57,11 @@ def load_conf_file():
             override = json.load(fh)
         conf.update(override)
     for key, val in secrets.items():
-        if isinstance(val, dict) and list(val.values())[0]:
+        if isinstance(val, dict) and None not in val.values():
             conf[key].update(val)
         elif isinstance(val, str):
             conf[key] = val
     conf['SECRET_KEY'] = b64decode(conf['SECRET_KEY'])
     return conf
-
 
 CONF_DICT = load_conf_file()

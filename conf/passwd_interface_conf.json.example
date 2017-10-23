@@ -85,5 +85,9 @@
         "start_tls": true,
         # optional. better to leave as none and provide at runtime
         "bind_passwd": none,
+    },
+    "SLACK": {
+        "web_api_token": "<SLACK_WEB_API_TOKEN>",
+        "search_field": "email"
     }
 }

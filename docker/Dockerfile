@@ -34,9 +34,9 @@ RUN ln -s /etc/password_interface/apache2.conf /etc/apache2/sites-available/pass
   && a2dissite 000-default \
   && a2enmod wsgi \
   && a2enmod ssl \
-  && a2enmod rewrite \
-  && mv /etc/password_interface/certs/server.c* /etc/ssl/certs \
-  && mv /etc/password_interface/certs/server.key /etc/ssl/private
+  && mkdir /certs \
+  && ln -s /etc/ssl/certs/ssl-cert-snakeoil.pem /certs/server.crt \
+  && ln -s /etc/ssl/private/ssl-cert-snakeoil.key /certs/server.key
 
 ADD src /opt/passwd_if
 

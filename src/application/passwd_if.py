@@ -16,6 +16,8 @@ limitations under the License.
 """
 
 
+import string
+import random
 import logging
 from time import time
 from datetime import datetime
@@ -27,7 +29,7 @@ from flask import Flask, request, session, jsonify, redirect, url_for, render_te
 
 from .password_interface import common
 from .password_interface.classes import (LDAPConnector, RedisTokens, Emailer, PasswdApiError,
-                                         Session, PasswordChecker, LDAPConnectorError)
+                                         Session, PasswordChecker, LDAPConnectorError, SlackAPI)
 
 
 app = Flask(__name__)
@@ -40,6 +42,7 @@ logger = logging.getLogger(__name__)
 LDAP = LDAPConnector(app.config['LDAP'])
 TOKEN = RedisTokens({'redis': REDIS})
 EMAIL = Emailer(app.config['EMAIL'])
+SLACK = SlackAPI(app.config['SLACK'])
 PC = PasswordChecker(app.config['PASS_CHECK'], REDIS)
 Session(app)
 
@@ -102,23 +105,36 @@ def authenticate():
     session['user_groups'] = user_groups
     return redirect(url_for(destination))
 
-@app.route('/emailReset', methods=['POST'])
-def emailReset():
-    """/emailReset route: POST
+@app.route('/tokenReset', methods=['POST'])
+def tokenReset():
+    """/tokenReset route: POST
 
     POST - form body
         users (list of str) req - list of users to kick off email reset for
+        service (str) req - slack | email
     """
     if not check_admin():
         PasswdApiError('Not Authorized. This route only for admins')
     users = request.form.getlist('user')
-    message = 'reset emails sent to: '
+    if request.form.get('slack'):
+        service = 'slack'
+    else:
+        service = 'email'
+    message = 'reset tokens sent via {} to: '.format(service)
+    logger.debug('users: {}'.format(users))
     for user in users:
         username, email = user.split(':')
+        logger.debug('username: {}'.format(username))
         token = TOKEN.create_token(username)
-        EMAIL.send_email(
-            email, [datetime.now().strftime('%Y-%m-%d %H:%M:%S'), session['username']],
-            [url_for('authenticate', token=token, _external=True)])
+        if service == 'email':
+            EMAIL.send_email(
+                email, [datetime.now().strftime('%Y-%m-%d %H:%M:%S'), session['username']],
+                [url_for('authenticate', token=token, _external=True)])
+        elif service == 'slack':
+            uid = SLACK.get_userid(email)
+            SLACK.send_message(
+                uid, 'To reset your password please follow this link: <{}>'.format(
+                    url_for('authenticate', token=token, _external=True)))
         message += '{}, '.format(username)
     session.set_message({'msg_type': 'success', 'msg': message[:-2]})
     return redirect(url_for('resetPasswd'))
@@ -166,7 +182,6 @@ def setUserPassword():
         username (str) opt - username of the user
         new_password (str) req - new password
     """
-    logger.debug('setUserPassword: %s', request.form)
     is_admin = check_admin()
     is_token_reset = check_token_reset()
     current_password = request.form.get('current_password')
@@ -175,15 +190,23 @@ def setUserPassword():
     else:
         username = session['username']
     if current_password and not LDAP.auth_user(username, request.form['current_password']):
-        session.set_message({'msg_type': 'error', 'msg': 'Your current password is incorrect'})
+        report_error('Your current password is incorrect')
         return redirect(url_for('resetPasswd'))
     new_pass = request.form['new_password']
     check_ret = PC.check_password(username, new_pass)
     if not check_ret[0]:
-        session.set_message({'msg_type': 'error', 'msg': check_ret[1]})
+        report_error(check_ret[1])
         return redirect(url_for('resetPasswd'))
     try:
-        if LDAP.set_user_password(username, new_pass):
+        if is_token_reset:
+            current_password = gen_pass()
+            resp = LDAP.set_user_password(username, current_password)
+            if resp != True:
+                report_error('Unable to set temporary password for token reset')
+                logger.error(resp)
+                return redirect(url_for('resetPasswd'))
+        resp = LDAP.set_user_password(username, new_pass, current_password)
+        if resp == True:
             message = {'msg_type': 'success', 'msg': 'Password change successful'}
             if current_password or is_token_reset:
                 session.clear()
@@ -195,10 +218,17 @@ def setUserPassword():
                 session.set_message(message)
                 return redirect(url_for('resetPasswd'))
         else:
-            session.set_message({'msg_type': 'error', 'msg': 'Password change failed'})
+            if resp['description'] == 'insufficientAccessRights':
+                message = '{}: password cannot be reset using this application'.format(username)
+                report_error(message)
+            elif resp['description'] == 'constraintViolation':
+                report_error('You cannot re-use passwords')
+            else:
+                report_error(resp['description'])
             return redirect(url_for('resetPasswd'))
     except LDAPConnectorError as exc:
-        session.set_message({'msg_type': 'error', 'msg': exc.error})
+        report_error(exc.error)
+        return redirect(url_for('resetPasswd'))
 
 @app.route('/logout')
 def logout():
@@ -215,6 +245,16 @@ def check_admin():
 def check_token_reset():
     """Verifies if the token_reset was set for this session"""
     return session.get('token_reset')
+
+def report_error(message):
+    """Logs the error and set the error message for the user"""
+    logger.error(message)
+    session.set_message({'msg_type': 'error', 'msg': message})
+
+def gen_pass(length=35, chars=None):
+    if not chars:
+        chars = string.ascii_letters + string.digits + string.punctuation
+    return ''.join(random.choice(chars) for _ in range(length))
 
 
 if __name__ == '__main__':
