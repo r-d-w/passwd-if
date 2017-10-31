@@ -194,19 +194,20 @@ def setUserPassword():
         return redirect(url_for('resetPasswd'))
     new_pass = request.form['new_password']
     check_ret = PC.check_password(username, new_pass)
+    policy_name = PC.get_policy_name(new_pass)
     if not check_ret[0]:
         report_error(check_ret[1])
         return redirect(url_for('resetPasswd'))
     try:
         if is_token_reset:
             current_password = gen_pass()
-            resp = LDAP.set_user_password(username, current_password)
+            resp = LDAP.set_user_password(username, current_password, policy_name=None)
             if resp != True:
                 report_error('Unable to set temporary password for token reset')
                 logger.error(resp)
                 return redirect(url_for('resetPasswd'))
-        resp = LDAP.set_user_password(username, new_pass, current_password)
-        if resp == True:
+        resp = LDAP.set_user_password(username, new_pass, current_password, policy_name)
+        if resp is True:
             message = {'msg_type': 'success', 'msg': 'Password change successful'}
             if current_password or is_token_reset:
                 session.clear()
@@ -252,6 +253,7 @@ def report_error(message):
     session.set_message({'msg_type': 'error', 'msg': message})
 
 def gen_pass(length=35, chars=None):
+    """generates a random password"""
     if not chars:
         chars = string.ascii_letters + string.digits + string.punctuation
     return ''.join(random.choice(chars) for _ in range(length))

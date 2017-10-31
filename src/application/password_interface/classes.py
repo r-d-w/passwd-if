@@ -121,6 +121,8 @@ class RedisTokens(object):
 class LDAPConnector(object):
     """Contains all LDAP operations"""
 
+    DEFAULT_PW_POLICY_NAME_ATTR = 'cn'
+
     def __init__(self, conf):
         """initalizes LDAPConnector object.
 
@@ -207,6 +209,61 @@ class LDAPConnector(object):
             raise LDAPConnectorError(error='Unable to bind', detail=self._ldap.result)
         logger.debug('LDAP connection established')
 
+    def find_pw_policy_group(self, policy_name=None, member_dn=None, name_attr=None):
+        """Finds password policy groups.
+
+        Narrow down your search by providing a member dn or a policy name (and optionally
+        the name attribute) or both.
+
+        Args:
+            policy_name: str (opt) - name of the password policy
+            member_dn: str (opt) - dn of the group member your looking for
+            name_attr: str (opt) - attribute to search against when lookin for policy names
+        Returns:
+            list of ldap objects found that match the criteria
+        """
+        if not name_attr:
+            name_attr = self.DEFAULT_PW_POLICY_NAME_ATTR
+        ldap_filter = '(&(objectClass=group)(msDS-PSOApplied=*)'
+        if policy_name:
+            ldap_filter += '({}={})'.format(name_attr, policy_name)
+        if member_dn:
+            ldap_filter += '(member={})'.format(member_dn)
+        ldap_filter += ')'
+        return self.search(ldap_filter, attributes=ldap3.ALL_ATTRIBUTES)
+
+    def update_user_pw_policy(self, user_dn, policy_name):
+        """Set a users password policy.
+
+        If the user already has other policies applied to it, remove those before
+        adding the requested policy to the user.
+
+        Args:
+            user_dn: str (req) - dn of the user whose policy you are updating
+            policy_name: str (req) - new policy being applied. None removes user from all
+                polices
+
+        Returns:
+            bool - success
+        """
+        logger.debug('update_user_pw_policy user_dn: %s policy_name: %s', user_dn, policy_name)
+        logger.debug('Searching for existing policy groups')
+        current_policy_groups = self.find_pw_policy_group(member_dn=user_dn)
+        if current_policy_groups:
+            logger.debug('Found existing policy groups: %s', len(current_policy_groups))
+        for policy_group in current_policy_groups:
+            logger.debug('Removing user: %s from policy group: %s', user_dn, policy_group.entry_dn)
+            self.modify_group_membership('rm', user_dn, policy_group.entry_dn)
+        if policy_name:
+            logger.debug('Searching for requested policy group')
+            group_dn = self.find_pw_policy_group(policy_name=policy_name)[0].entry_dn
+            logger.debug('Found policy group dn: %s', group_dn)
+            logger.debug('Adding %s to policy group: %s', user_dn, group_dn)
+            if not self.modify_group_membership('add', user_dn, group_dn):
+                logger.error('Failed to add %s to policy group: %s', user_dn, group_dn)
+                return
+        logger.info('Successfully updated %s password policy to %s')
+
     def search(self, ldap_filter, subtree=None, attributes=None):
         """Generic search function
 
@@ -270,7 +327,28 @@ class LDAPConnector(object):
             logger.debug('User auth failed')
             return False
 
-    def set_user_password(self, username, new_pass, current_password=None):
+    def modify_group_membership(self, action, obj_dn, group_dn):
+        """takes a user dn and adds it to the group_dn"""
+        logger.debug(
+            'add_user_to_group action: %s obj_dn: %s group_dn: %s', action, obj_dn, group_dn)
+        if action == 'add':
+            ldap_op = ldap3.MODIFY_ADD
+        elif action == 'rm':
+            ldap_op = ldap3.MODIFY_DELETE
+        else:
+            raise LDAPConnectorError('modify_group_member action paramater must be "add" or "rm"')
+        full_op = {self._member_attr: [(ldap_op, [obj_dn])]}
+        logger.debug('Attempting to modify ldap with: %s', str(full_op))
+        self.connect()
+        self._ldap.modify(group_dn, full_op)
+        if self._ldap.result['description'] == 'success':
+            logger.info('Successfully added: %s to: %s', obj_dn, group_dn)
+            return True
+        logger.error(
+            'Unable to add: %s to %s. ldap response: %s', obj_dn, group_dn, self._ldap.result)
+        return False
+
+    def set_user_password(self, username, new_pass, current_password=None, policy_name=None):
         """sets the users password to the supplied string, returns True for successful and
         the error message if its not"""
         logger.debug('set_user_password username: %s', username)
@@ -281,7 +359,8 @@ class LDAPConnector(object):
         except AttributeError:
             raise LDAPConnectorError(error='username not found: {}'.format(username))
         self.connect()
-        resp = passwdf(user_dn, new_pass, current_password)
+        resp = passwdf(user_dn, new_password=new_pass, old_password=current_password)
+        self.update_user_pw_policy(user_dn, policy_name)
         logger.debug('modify_password_response: %s', resp)
         return resp
 
@@ -377,7 +456,7 @@ class SlackAPI(object):
             if field in user['profile']:
                 if user['profile'][field] == query:
                     return user['id']
- 
+
     def send_message(self, uid, message):
         """send a message to the specified user"""
         self._slack.api_call('chat.postMessage', channel=uid, text=message)
@@ -479,6 +558,15 @@ class PasswordChecker(object):
         llen = self._redis.lpush(key, self._create_bcrypt_hash(password))
         if llen > self.max_history:
             self._redis.ltrim(key, 0, self.max_history - 1)
+
+    def get_policy_name(self, password):
+        """takes password and returns the password policy that applies
+        to that password"""
+        plen = len(password)
+        for length in reversed(self.policies):
+            if plen >= length:
+                return self.policies[length].get('policy_name')
+        return None
 
     def check_password(self, username, password):
         """takes a password returns a tuple with status and an error message"""

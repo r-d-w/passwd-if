@@ -52,10 +52,12 @@
         "track_usage": true,
         "policies": {
             "25": {
+                "policy_name": "pw_length_gt_25",
                 "char_classes": 1,
                 "expires": 720
             },
             "10": {
+                "policy_name": "pw_length_gt_14",
                 "expires": 180
             }
         }
@@ -85,6 +87,7 @@
         "start_tls": true,
         # optional. better to leave as none and provide at runtime
         "bind_passwd": none,
+        "pw_policy_name_attr": "<LDAP_ATTRIBUTE_MATCH_PW_POLICY_NAME>"
     },
     "SLACK": {
         "web_api_token": "<SLACK_WEB_API_TOKEN>",

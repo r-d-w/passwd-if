@@ -40,3 +40,11 @@ services:
 docker-compose -f compose/docker-compose.yml -f compose/dev-compose.yml -p passwd_if up
 docker-compose -f compose/docker-compose.yml -f compose/prod-compose.yml -p passwd_if up -d
 ```
+
+# setting up active directory password policy objects (assumes Windows Server 2016+)
+- Create group for each password length policy you have, default being most restrictive min
+- Open Active Directory Administration Center
+- Navigate through <YOUR_DOM> => System => Password Setting Container
+- Task => New => Password Setting
+- Name something logical and match settings appropriate to the policy from passwd-if conf
+- Add in the correct group for this policy
