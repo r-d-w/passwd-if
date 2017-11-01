@@ -1,26 +1,23 @@
 #!/usr/bin/evn python3
-"""
-Copyright 2017 Ryan David Williams
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-"""
+# Copyright 2017 Ryan David Williams
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 import string
 import random
 import logging
 from time import time
-from datetime import datetime
 
 
 from redis import StrictRedis
@@ -28,8 +25,8 @@ from flask import Flask, request, session, jsonify, redirect, url_for, render_te
 
 
 from .password_interface import common
-from .password_interface.classes import (LDAPConnector, RedisTokens, Emailer, PasswdApiError,
-                                         Session, PasswordChecker, LDAPConnectorError, SlackAPI)
+from .password_interface.classes import (LDAPConnector, RedisTokens, PasswdApiError,
+                                         Session, PasswordChecker, LDAPConnectorError)
 
 
 app = Flask(__name__)
@@ -41,9 +38,8 @@ if common.DEBUG:
 logger = logging.getLogger(__name__)
 LDAP = LDAPConnector(app.config['LDAP'])
 TOKEN = RedisTokens({'redis': REDIS})
-EMAIL = Emailer(app.config['EMAIL'])
-SLACK = SlackAPI(app.config['SLACK'])
 PC = PasswordChecker(app.config['PASS_CHECK'], REDIS)
+PLUGINS = common.load_plugins(app.config['plugins'])
 Session(app)
 
 
@@ -121,20 +117,14 @@ def tokenReset():
     else:
         service = 'email'
     message = 'reset tokens sent via {} to: '.format(service)
-    logger.debug('users: {}'.format(users))
+    logger.debug('users: %s', users)
     for user in users:
         username, email = user.split(':')
-        logger.debug('username: {}'.format(username))
+        logger.debug('username: %s', username)
         token = TOKEN.create_token(username)
-        if service == 'email':
-            EMAIL.send_email(
-                email, [datetime.now().strftime('%Y-%m-%d %H:%M:%S'), session['username']],
-                [url_for('authenticate', token=token, _external=True)])
-        elif service == 'slack':
-            uid = SLACK.get_userid(email)
-            SLACK.send_message(
-                uid, 'To reset your password please follow this link: <{}>'.format(
-                    url_for('authenticate', token=token, _external=True)))
+        if service in PLUGINS['token']:
+            PLUGINS['token'][service].send_token(
+                email, session['username'], url_for('authenticate', token=token, _external=True))
         message += '{}, '.format(username)
     session.set_message({'msg_type': 'success', 'msg': message[:-2]})
     return redirect(url_for('resetPasswd'))
@@ -164,7 +154,8 @@ def resetPasswd():
                     app.config['email_attribute'], app.config['name_attribute'],
                     app.config['LDAP']['username_attribute']])}
         return render_template(
-            'resetPasswd.html', admin=True, users=users, requirements=PC)
+            'resetPasswd.html', admin=True, users=users, requirements=PC,
+            token_plugins=PLUGINS.get('token', {}).keys())
     else:
         return render_template('resetPasswd.html', requirements=PC)
 

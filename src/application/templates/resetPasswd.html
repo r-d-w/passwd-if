@@ -88,6 +88,7 @@ limitations under the License.
         </div>
         <div class="col-md-3"></div>
     </div>
+    {% if token_plugins %}
     <div class="row">
         <div class="col-md-3"></div>
         <div id="email_reset" class="col-md-6 page_module">
@@ -99,11 +100,15 @@ limitations under the License.
                         <option value="{{ val }}">{{ name }}</option>
                     {% endfor %}
                 </select>
-                <p><input class="btn btn-default" name="email" type="submit" value="Email Reset Links"><input class="btn btn-default" name="slack" type="submit" value="Slack Reset Links">
+                <p>
+                    {% for plugin in token_plugins %}
+                    <input class="btn btn-default" name="{{ plugin }}" type="submit" value="{{ plugin }} token">
+                    {% endfor %}
             </form>
         </div>
         <div class="col-md-3"></div>
     </div>
+    {% endif %}
     {% endif %}
 {% endblock %}
 {% block page_scripts %}
