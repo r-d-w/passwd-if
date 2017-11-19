@@ -17,12 +17,12 @@
 version: "3"
 services:
 
-  passwd_if_redis_server:
-    container_name: passwd_if_redis_server
+  passwd-if-redis-server:
+    container_name: passwd-if-redis-server
     image: healthcheck/redis
     restart: unless-stopped
     networks:
-      - passwd_if_net
+      - passwd-if-net
     healthcheck:
       test: ["CMD-SHELL", "docker-healthcheck"]
       interval: 15s
@@ -32,17 +32,17 @@ services:
       - "redis-volume:/data"
     command: redis-server --appendonly yes
 
-  passwd_if_app:
-    container_name: passwd_if_app
-    image: passwd_if/app
+  passwd-if-app:
+    container_name: passwd-if-app
+    image: passwd-if
     build:
       context: ../../
       dockerfile: docker/Dockerfile
     depends_on:
-      - passwd_if_redis_server
+      - passwd-if-redis-server
     restart: unless-stopped
     networks:
-      - passwd_if_net
+      - passwd-if-net
     ports:
       - "80:80"
       - "443:443"
@@ -51,6 +51,6 @@ volumes:
   redis-volume:
 
 networks:
-  passwd_if_net:
+  passwd-if-net:
     driver: bridge
   

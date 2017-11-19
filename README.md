@@ -2,12 +2,19 @@
 
 Python/Flask Web App for managing user passwords including self service.
 
+## initial configuration
+
+You will need to provide a configuration file for apache and the password interface python application. You can copy the examples in the conf directory and replace the <PLACEHOLDERS> with values appropriate for you environment.  There are a number of sensitive fields that you can chose to store in the configuration files, but it is not recommmended.  Instead, you should pass in your secrets via environment variables or through files in the secrets directory.
+
 ```
 cp conf/apache2.conf.example conf/apache2.conf
 cp conf/passwd_interface_conf.json.example conf/passwd_interface_conf.json
 $EDITOR conf/apache2.conf
 $EDITOR conf/passwd_interface_conf.json
 ```
+## Sensetive data
+
+## Development setup with debugger
 
 ```
 $ cat docker/compose/dev-compose.yml
@@ -25,6 +32,7 @@ services:
     env_file: ../../secrets/env_secrets
 ```
 
+## development setup wtih apache
 ```
 $ cat docker/compose/prod-compose.yml
 version: "3"

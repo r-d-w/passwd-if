@@ -1,5 +1,4 @@
 .vscode
-conf/passwd_interface_conf.json
+conf
 *.pyc
-secrets/certs
-secrets/env_secrets
+secrets

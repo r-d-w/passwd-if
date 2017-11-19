@@ -1,1 +1,3 @@
-Secrets go in this folder.  You will want to create a `certs` directory that contains a `server.crt` and `server.key` file for SSL termination.  `server.crt` should contain the entire chain, server cert first, encoded in PEM.
+While developing secrets can go here.  For production deployments, use your best judgement getting your secrets into your environment.
+
+You will want to create a `certs` directory that contains a `server.crt` and `server.key` file for SSL termination.  `server.crt` should contain the entire chain, server cert first, encoded in PEM. If you choose not to include a certs directory, the image will default to using the randomly generated ones installed with ssl-cert.  Fine for dev, wouldn't recommend it in prod.

@@ -27,10 +27,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y install \
 ADD requirements.txt /
 RUN pip3 install -r /requirements.txt
 
-ADD conf /etc/password_interface
-
-RUN ln -s /etc/password_interface/apache2.conf /etc/apache2/sites-available/password_interface.conf \
-  && a2ensite password_interface \
+RUN ln -s /etc/password_interface/apache2.conf /etc/apache2/sites-enabled/password_interface.conf \
   && a2dissite 000-default \
   && a2enmod wsgi \
   && a2enmod ssl \

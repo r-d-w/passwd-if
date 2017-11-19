@@ -1,0 +1,63 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose -f ../docker/compose/docker-compose.yml convert
+    kompose.version: 1.4.0 (c7964e7)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: passwd-if-app
+  name: passwd-if-app
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.service: passwd-if-app
+    spec:
+      containers:
+      - image: xrdwx/passwd-if
+        name: passwd-if-app
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        resources: {}
+        volumeMounts:
+        - name: certs-volume
+          mountPath: "/certs"
+          readOnly: true
+        - name: config-volume
+          mountPath: "/etc/password_interface"
+          readOnly: true
+        env:
+          - name: PASSWD_INTERFACE_SCONF__SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: passwd-if-app-secrets
+                key: FLASK_SECRET_KEY
+          - name: PASSWD_INTERFACE_SCONF__LDAP__BIND_PASSWD
+            valueFrom:
+              secretKeyRef:
+                name: passwd-if-app-secrets
+                key: LDAP_BIND_PASS
+          - name: PASSWD_INTERFACE_SCONF__PLUGINS__TOKEN__EMAIL__CONFIG__SMTP_PASS
+            valueFrom:
+              secretKeyRef:
+                name: passwd-if-app-secrets
+                key: TOKEN_EMAIL_CONFIG_SMTP_PASS
+          - name: PASSWD_INTERFACE_SCONF__PLUGINS__TOKEN__SLACK__CONFIG__WEB_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: passwd-if-app-secrets
+                key: TOKEN_SLACK_CONFIG_WEB_API_TOKEN
+      volumes:
+        - name: certs-volume
+          secret:
+            secretName: passwd-if-app-certs
+        - name: config-volume
+          configMap:
+            name: passwd-if-configmap
+      restartPolicy: Always
+status: {}
