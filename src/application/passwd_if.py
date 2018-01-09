@@ -209,6 +209,7 @@ def setUserPassword():
                 report_error('Unable to set temporary password for token reset')
                 logger.error(resp)
                 return redirect(url_for('resetPasswd'))
+        logger.info('Attempting to set password for: %s', username)
         resp = LDAP.set_user_password(username, new_pass, current_password, policy_name)
         if resp is True:
             message = {'msg_type': 'success', 'msg': 'Password change successful'}
