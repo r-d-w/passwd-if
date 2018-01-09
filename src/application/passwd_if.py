@@ -29,6 +29,7 @@ from .password_interface.classes import (LDAPConnector, RedisTokens, PasswdApiEr
                                          Session, PasswordChecker, LDAPConnectorError)
 
 
+common.init_json_logging(common.CONF_DICT['logging_conf'], common.DEBUG)
 app = Flask(__name__)
 REDIS = StrictRedis(host=common.REDIS_HOST)
 app.config.update(common.CONF_DICT)
@@ -99,6 +100,7 @@ def authenticate():
     session['username'] = username
     session['session_start'] = int(time())
     session['user_groups'] = user_groups
+    logger.info('Login Success: %s', username)
     return redirect(url_for(destination))
 
 @app.route('/tokenReset', methods=['POST'])
@@ -109,15 +111,18 @@ def tokenReset():
         users (list of str) req - list of users to kick off email reset for
         service (str) req - slack | email
     """
+    logger.debug('token reset requested')
     if not check_admin():
         PasswdApiError('Not Authorized. This route only for admins')
     users = request.form.getlist('user')
+    logger.debug('token reset users: %s', users)
     if request.form.get('slack'):
         service = 'slack'
+        logger.debug('slack token reset requested')
     else:
+        logger.debug('email token reset requested')
         service = 'email'
     message = 'reset tokens sent via {} to: '.format(service)
-    logger.debug('users: %s', users)
     for user in users:
         username, email = user.split(':')
         logger.debug('username: %s', username)
@@ -127,6 +132,7 @@ def tokenReset():
                 email, session['username'], url_for('authenticate', token=token, _external=True))
         message += '{}, '.format(username)
     session.set_message({'msg_type': 'success', 'msg': message[:-2]})
+    logger.info(message)
     return redirect(url_for('resetPasswd'))
 
 @app.route('/login')
@@ -140,9 +146,11 @@ def resetPasswd():
     """/resetPasswd route: GET"""
     un_attr = app.config['LDAP']['username_attribute']
     if check_token_reset():
+        logger.debug('resetPasswd check_token_reset: %s', True)
         return render_template(
             'resetPasswd.html', token_reset=True, requirements=PC)
     elif check_admin():
+        logger.debug('resetPasswd check_admin: %s', True)
         users = {
             '{}:{}'.format(
                 user[un_attr].value, user[app.config['email_attribute']].value): user[
@@ -157,6 +165,7 @@ def resetPasswd():
             'resetPasswd.html', admin=True, users=users, requirements=PC,
             token_plugins=PLUGINS.get('token', {}).keys())
     else:
+        logger.debug('resetPasswd regular user login')
         return render_template('resetPasswd.html', requirements=PC)
 
 @app.route('/session_info')
@@ -174,12 +183,15 @@ def setUserPassword():
         new_password (str) req - new password
     """
     is_admin = check_admin()
+    logger.debug('setUserPassword is_admin: %s', is_admin)
     is_token_reset = check_token_reset()
+    logger.debug('setUserPassword is_token_reset: %s', is_token_reset)
     current_password = request.form.get('current_password')
     if is_admin and not is_token_reset:
         username = request.form.get('username', session['username'])
     else:
         username = session['username']
+    logger.debug('setUserPassword username: %s', username)
     if current_password and not LDAP.auth_user(username, request.form['current_password']):
         report_error('Your current password is incorrect')
         return redirect(url_for('resetPasswd'))
@@ -200,6 +212,7 @@ def setUserPassword():
         resp = LDAP.set_user_password(username, new_pass, current_password, policy_name)
         if resp is True:
             message = {'msg_type': 'success', 'msg': 'Password change successful'}
+            logger.info('Password change successful')
             if current_password or is_token_reset:
                 session.clear()
                 session.set_message(message)
@@ -227,6 +240,7 @@ def logout():
     """/logout route: GET"""
     session.clear()
     session.set_message({'msg_type': 'success', 'msg': 'Logout Successful'})
+    logger.info('Logout Success')
     return redirect(url_for('login'))
 
 def check_admin():
@@ -251,5 +265,4 @@ def gen_pass(length=35, chars=None):
 
 
 if __name__ == '__main__':
-    common.init_json_logging(app.config['logging_conf'], common.DEBUG)
     app.run(debug=True)
