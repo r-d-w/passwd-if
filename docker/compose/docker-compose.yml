@@ -46,9 +46,12 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    volumes:
+      - "apache-logs:/var/log/apache2"
 
 volumes:
   redis-volume:
+  apache-logs:
 
 networks:
   passwd-if-net:
