@@ -254,7 +254,7 @@ class LDAPConnector(object):
             if not self.modify_group_membership('add', user_dn, group_dn):
                 logger.error('Failed to add %s to policy group: %s', user_dn, group_dn)
                 return
-        logger.info('Successfully updated %s password policy to %s')
+        logger.info('Successfully updated %s password policy to %s', user_dn, policy_name)
 
     def search(self, ldap_filter, subtree=None, attributes=None):
         """Generic search function
